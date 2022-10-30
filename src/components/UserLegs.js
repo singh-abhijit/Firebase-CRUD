@@ -10,15 +10,17 @@ import {
 } from "constants";
 import { useEffect } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
+import LegDataService from "services/legs";
 
 const LegItem = ({
   legDetails,
   legIndex,
   handleUpdateLegItem: updateLegData,
   remove,
-  append,
+  refetch,
 }) => {
   const {
+    firebaseId,
     lots,
     position: selectedPosition,
     type: selectedType,
@@ -35,9 +37,15 @@ const LegItem = ({
     trailValue2 = 0,
   } = legDetails;
 
-  const removeItem = () => remove(legIndex);
+  const removeItem = () => {
+    remove(legIndex);
+    LegDataService.deleteLeg(firebaseId);
+  };
 
-  const copyThisItem = () => append(legDetails);
+  const copyThisItem = () => {
+    LegDataService.addLegs(legDetails);
+    refetch();
+  };
 
   return (
     <div className="leg-item-container">
@@ -202,8 +210,8 @@ const LegItem = ({
   );
 };
 
-const UserLegs = ({ allLegs, lastUpdatedAt, saveLegs }) => {
-  const { control, trigger, handleSubmit, watch, setValue } = useForm({
+const UserLegs = ({ allLegs, lastUpdatedAt, refetch }) => {
+  const { control, handleSubmit, watch, setValue } = useForm({
     defaultValues: {
       legs: allLegs,
     },
@@ -215,7 +223,6 @@ const UserLegs = ({ allLegs, lastUpdatedAt, saveLegs }) => {
 
   const {
     fields: legs,
-    append,
     remove,
     update,
   } = useFieldArray({
@@ -230,19 +237,23 @@ const UserLegs = ({ allLegs, lastUpdatedAt, saveLegs }) => {
       ...watchLegDetails,
       [field]: value,
     });
+
+    LegDataService.updateLeg(watchLegDetails.firebaseId, {
+      ...watchLegDetails,
+      [field]: value,
+    });
   };
 
   const handleSavePreferences = () => {
     // save to firebase
-    console.log(watch().legs);
-    saveLegs(watch().legs);
+    // removed save button, saving every change now & refetching only after adding new leg
   };
 
   return (
     <>
       <form onSubmit={handleSubmit(handleSavePreferences)}>
         {legs.map((legDetails, legIndex) => (
-          <div key={`leg-item-${legIndex}`} className="my-8">
+          <div key={`leg-item-${legDetails.firebaseId}`} className="my-8">
             <LegItem
               legDetails={legDetails}
               legIndex={legIndex}
@@ -250,21 +261,10 @@ const UserLegs = ({ allLegs, lastUpdatedAt, saveLegs }) => {
                 handleUpdateLegItem(legIndex, field, value)
               }
               remove={remove}
-              append={append}
+              refetch={refetch}
             />
           </div>
         ))}
-
-        <div className="">
-          <Button
-            type="button"
-            variant="contained"
-            onClick={handleSavePreferences}
-            className="m-auto"
-          >
-            Save Preferences
-          </Button>
-        </div>
       </form>
     </>
   );
